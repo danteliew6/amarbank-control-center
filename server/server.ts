@@ -84,12 +84,20 @@ createApp({
         }
         const rec = buildFraudFeatures(parsed.data);
         try {
-          const result = await appkit.serving('default').invoke({ dataframe_records: [rec] });
-          if (!result.ok) {
-            res.status(result.status ?? 502).json({ error: result.message ?? 'Invocation failed' });
+          // The exported invoke returns an execution wrapper { ok, status, data, message }
+          // at runtime (the generated type only describes the response `data` shape), so
+          // read it defensively and forward the endpoint's raw prediction payload.
+          const raw = (await appkit.serving('default').invoke({ dataframe_records: [rec] })) as unknown;
+          if (raw && typeof raw === 'object') {
+            const w = raw as { ok?: boolean; status?: number; data?: unknown; message?: string };
+            if (w.ok === false) {
+              res.status(w.status ?? 502).json({ error: w.message ?? 'Invocation failed' });
+              return;
+            }
+            res.json('data' in w ? w.data : raw);
             return;
           }
-          res.json(result.data);
+          res.json(raw);
         } catch (e) {
           res.status(500).json({ error: String(e) });
         }

@@ -88,8 +88,17 @@ createApp({
 				}
 				const rec = buildFraudFeatures(parsed.data);
 				try {
-					const result = await appkit.serving("default").invoke({ dataframe_records: [rec] });
-					res.json(result);
+					const raw = await appkit.serving("default").invoke({ dataframe_records: [rec] });
+					if (raw && typeof raw === "object") {
+						const w = raw;
+						if (w.ok === false) {
+							res.status(w.status ?? 502).json({ error: w.message ?? "Invocation failed" });
+							return;
+						}
+						res.json("data" in w ? w.data : raw);
+						return;
+					}
+					res.json(raw);
 				} catch (e) {
 					res.status(500).json({ error: String(e) });
 				}
