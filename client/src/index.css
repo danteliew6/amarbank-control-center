@@ -1,0 +1,44 @@
+@import "@databricks/appkit-ui/styles.css";
+
+/* ===== Amar Bank whitelabel theme =====
+   Amar Bank is an Indonesian digital bank (Senyumku savings + Tunaiku lending).
+   Deep indigo/violet primary for the chrome; semantic red/amber/emerald are kept
+   free for fraud-risk banding on the data surfaces. */
+:root {
+  --radius: 0.625rem;
+  --primary: oklch(0.48 0.17 285);          /* indigo-violet */
+  --primary-foreground: oklch(0.99 0 0);
+  --ring: oklch(0.55 0.16 288);
+  --accent: oklch(0.95 0.03 288);
+  --accent-foreground: oklch(0.32 0.12 285);
+  /* chart palette: violet family + teal + gold */
+  --chart-1: oklch(0.48 0.17 285);
+  --chart-2: oklch(0.60 0.15 300);
+  --chart-3: oklch(0.66 0.12 200);
+  --chart-4: oklch(0.80 0.14 85);
+  --chart-5: oklch(0.62 0.19 25);
+  /* Amar brand tokens for custom UI */
+  --ab-indigo: #4c2a86;
+  --ab-violet: #7c3aed;
+  --ab-gold: #f4b740;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: oklch(0.68 0.16 288);
+    --primary-foreground: oklch(0.15 0.02 285);
+    --ring: oklch(0.68 0.16 288);
+    --accent: oklch(0.30 0.07 285);
+    --accent-foreground: oklch(0.95 0.02 288);
+    --chart-1: oklch(0.70 0.16 288);
+    --chart-2: oklch(0.66 0.15 305);
+    --chart-3: oklch(0.70 0.12 200);
+    --chart-4: oklch(0.82 0.15 85);
+    --chart-5: oklch(0.68 0.19 25);
+  }
+}
+
+/* Amar Bank gradient header bar */
+.ab-header {
+  background: linear-gradient(90deg, var(--ab-indigo) 0%, var(--ab-violet) 100%);
+}

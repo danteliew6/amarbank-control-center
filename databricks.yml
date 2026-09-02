@@ -1,0 +1,54 @@
+bundle:
+  name: amarbank-control-center
+
+variables:
+  sql_warehouse_id:
+    description: SQL Warehouse ID
+  genie_space_id:
+    description: Default Genie Space ID
+  genie_space_name:
+    description: Genie Space display name
+  lakebase_branch:
+    description: Lakebase branch resource name
+  lakebase_database:
+    description: Lakebase database resource name
+
+resources:
+  apps:
+    app:
+      name: "amarbank-control-center"
+      description: "Amar Bank retail-banking control center"
+      source_code_path: ./
+      git_repository:
+        provider: gitHub
+        url: https://github.com/danteliew6/amarbank-control-center
+      user_api_scopes:
+        - dashboards.genie
+
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.sql_warehouse_id}
+            permission: CAN_USE
+        - name: genie-space
+          genie_space:
+            name: ${var.genie_space_name}
+            space_id: ${var.genie_space_id}
+            permission: CAN_RUN
+        - name: postgres
+          postgres:
+            branch: ${var.lakebase_branch}
+            database: ${var.lakebase_database}
+            permission: CAN_CONNECT_AND_CREATE
+
+targets:
+  default:
+    default: true
+    workspace:
+      host: https://fevm-dante-classic-stable.cloud.databricks.com
+    variables:
+      sql_warehouse_id: 114b2f7bfa1273b1
+      genie_space_id: 01f1a6a6720b178c97b9b02beb3d0741
+      genie_space_name: Amar Bank Retail Assistant
+      lakebase_branch: projects/amarbank-cc-db/branches/production
+      lakebase_database: projects/amarbank-cc-db/branches/production/databases/databricks-postgres
