@@ -9,7 +9,6 @@ import {
   Input,
   Label,
   useAnalyticsQuery,
-  useServingInvoke,
 } from '@databricks/appkit-ui/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -250,7 +249,7 @@ const PRESETS: { label: string; icon: ReactNode; state: WhatIfState }[] = [
   { label: 'Normal QRIS payment', icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     state: { amount: 48000, channel: 'QRIS', night: false, foreign: false, newDevice: false, highRisk: false, distance: 3, velocity: 1, zscore: 0.2 } },
   { label: 'Late-night foreign cashout', icon: <TrendingUp className="h-3.5 w-3.5" />,
-    state: { amount: 5200000, channel: 'TRANSFER', night: true, foreign: true, newDevice: false, highRisk: true, distance: 940, velocity: 5, zscore: 3.5 } },
+    state: { amount: 5200000, channel: 'TRANSFER', night: true, foreign: true, newDevice: true, highRisk: true, distance: 940, velocity: 6, zscore: 4.0 } },
   { label: 'New-device account takeover', icon: <ShieldAlert className="h-3.5 w-3.5" />,
     state: { amount: 3000000, channel: 'TRANSFER', night: true, foreign: true, newDevice: true, highRisk: true, distance: 620, velocity: 4, zscore: 3.0 } },
 ];
@@ -291,33 +290,31 @@ function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange:
 function WhatIfScore() {
   const [st, setSt] = useState<WhatIfState>(PRESETS[0].state);
   const set = <K extends keyof WhatIfState>(k: K, v: WhatIfState[K]) => setSt((s) => ({ ...s, [k]: v }));
-  const { invoke, loading, error } = useServingInvoke({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [score, setScore] = useState<number | null>(null);
 
+  // Score via the backend route, which invokes the endpoint as the app SP (no OBO scope).
   function run() {
-    const rec = {
-      amount: st.amount,
-      log_amount: Math.log(st.amount + 1),
-      txn_hour: st.night ? 2 : 14,
-      is_night: st.night ? 1 : 0,
-      is_foreign_ip: st.foreign ? 1 : 0,
-      is_new_device: st.newDevice ? 1 : 0,
-      home_distance_km: st.distance,
-      merchant_high_risk: st.highRisk ? 1 : 0,
-      txn_velocity_1h: st.velocity,
-      device_txn_24h: st.newDevice ? 1 : 8,
-      amount_zscore: st.zscore,
-      ch_qris: st.channel === 'QRIS' ? 1 : 0,
-      ch_transfer: st.channel === 'TRANSFER' ? 1 : 0,
-      ch_atm: st.channel === 'ATM' ? 1 : 0,
-      ch_card: st.channel === 'CARD' ? 1 : 0,
-      ch_topup: st.channel === 'TOPUP' ? 1 : 0,
-      ch_billpay: st.channel === 'BILLPAY' ? 1 : 0,
-    };
-    void invoke({ dataframe_records: [rec] }).then((res) => {
-      const s = extractScore(res);
-      if (s !== null) setScore(s);
-    });
+    setLoading(true);
+    setError(null);
+    fetch('/api/score/txn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(st),
+    })
+      .then((r) => r.json())
+      .then((res: unknown) => {
+        if (res && typeof res === 'object' && 'error' in res) {
+          setError(String((res as { error: unknown }).error));
+          return;
+        }
+        const s = extractScore(res);
+        if (s !== null) setScore(s);
+        else setError('No score returned');
+      })
+      .catch((e: unknown) => setError(String(e)))
+      .finally(() => setLoading(false));
   }
 
   const band = score !== null ? scoreBand(score) : null;

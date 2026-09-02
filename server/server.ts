@@ -1,6 +1,43 @@
 import { createApp, analytics, genie, server, serving, lakebase } from '@databricks/appkit';
 import { z } from 'zod';
 
+// What-if fraud scoring: human-friendly inputs; the backend derives the 17
+// all-double model features and invokes the serving endpoint as the app SP
+// (SP context via the bound serving-endpoint resource — no OBO / user scope needed).
+const ScoreInput = z.object({
+  amount: z.number().min(0),
+  channel: z.enum(['QRIS', 'TRANSFER', 'ATM', 'CARD', 'TOPUP', 'BILLPAY']),
+  night: z.boolean(),
+  foreign: z.boolean(),
+  newDevice: z.boolean(),
+  highRisk: z.boolean(),
+  distance: z.number().min(0),
+  velocity: z.number().min(0),
+  zscore: z.number(),
+});
+
+function buildFraudFeatures(i: z.infer<typeof ScoreInput>): Record<string, number> {
+  return {
+    amount: i.amount,
+    log_amount: Math.log(i.amount + 1),
+    txn_hour: i.night ? 2 : 14,
+    is_night: i.night ? 1 : 0,
+    is_foreign_ip: i.foreign ? 1 : 0,
+    is_new_device: i.newDevice ? 1 : 0,
+    home_distance_km: i.distance,
+    merchant_high_risk: i.highRisk ? 1 : 0,
+    txn_velocity_1h: i.velocity,
+    device_txn_24h: i.newDevice ? 1 : 8,
+    amount_zscore: i.zscore,
+    ch_qris: i.channel === 'QRIS' ? 1 : 0,
+    ch_transfer: i.channel === 'TRANSFER' ? 1 : 0,
+    ch_atm: i.channel === 'ATM' ? 1 : 0,
+    ch_card: i.channel === 'CARD' ? 1 : 0,
+    ch_topup: i.channel === 'TOPUP' ? 1 : 0,
+    ch_billpay: i.channel === 'BILLPAY' ? 1 : 0,
+  };
+}
+
 // Write-back payload: a fraud-ops decision on a flagged transaction / case.
 const CaseActionInput = z.object({
   txn_id: z.string().max(64).optional(),
@@ -36,6 +73,28 @@ createApp({
     `);
 
     appkit.server.extend((app) => {
+      // --- What-if fraud scoring: invoke the serving endpoint as the app SP ---
+      // Uses appkit.serving(...).invoke (SP/service-principal context by default), so
+      // it does NOT rely on the end-user's OBO token (which lacks a model-serving scope).
+      app.post('/api/score/txn', async (req, res) => {
+        const parsed = ScoreInput.safeParse(req.body);
+        if (!parsed.success) {
+          res.status(400).json({ error: 'Invalid input', details: parsed.error.issues });
+          return;
+        }
+        const rec = buildFraudFeatures(parsed.data);
+        try {
+          const result = await appkit.serving('default').invoke({ dataframe_records: [rec] });
+          if (!result.ok) {
+            res.status(result.status ?? 502).json({ error: result.message ?? 'Invocation failed' });
+            return;
+          }
+          res.json(result.data);
+        } catch (e) {
+          res.status(500).json({ error: String(e) });
+        }
+      });
+
       // --- Write-back: record a fraud-ops decision on a transaction / case ---
       app.post('/api/ops/case-actions', async (req, res) => {
         const parsed = CaseActionInput.safeParse(req.body);
