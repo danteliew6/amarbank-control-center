@@ -36,7 +36,11 @@ interface Kpis {
   queue_size: number; critical: number; high: number; medium: number;
   amount_at_risk_bn: number; customers: number; avg_score: number;
 }
-interface RegionRow { region: string; cases: number; critical: number; amount_bn: number; avg_score: number; }
+interface RegionRow {
+  region: string; cases: number; critical: number; high: number; amount_bn: number; avg_score: number;
+  customers: number; foreign_pct: number; night_pct: number; new_device_pct: number;
+  top_reason: string; top_channel: string; top_merchant: string;
+}
 interface DailyRow { day: string; txns: number; fraud_txns: number; fraud_amount_bn: number; fraud_rate_pct: number; }
 interface TxnRow {
   txn_id: string; customer_id: string; channel: string; txn_time: string;
@@ -123,7 +127,9 @@ function hotColor(cases: number): string {
   return '#10b981';
 }
 
-function RegionMap({ regions }: { regions: RegionRow[] }) {
+function RegionMap({ regions, selected, onSelect }: {
+  regions: RegionRow[]; selected: string | null; onSelect: (region: string | null) => void;
+}) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [w, setW] = useState(680);
   useEffect(() => {
@@ -195,19 +201,26 @@ function RegionMap({ regions }: { regions: RegionRow[] }) {
             const col = hotColor(N(p.cases));
             const r = 12 + Math.sqrt(N(p.cases) / maxCases) * 26;
             const hot = N(p.cases) >= 500;
+            const sel = p.region === selected;
+            const dim = selected !== null && !sel;
             return (
-              <div key={p.region}
-                   title={`${p.region} · ${N(p.cases)} cases · ${N(p.critical)} critical · ${rp(N(p.amount_bn) * 1e9)} at risk`}
-                   className={`absolute ${hot ? 'animate-pulse' : ''}`}
+              <button key={p.region} type="button"
+                   onClick={() => onSelect(sel ? null : p.region)}
+                   title={`${p.region} · ${N(p.cases)} cases · ${N(p.critical)} critical · ${rp(N(p.amount_bn) * 1e9)} at risk · click to drill in`}
+                   className={`absolute cursor-pointer ${hot && !dim ? 'animate-pulse' : ''}`}
                    style={{
                      left: x, top: y, width: r * 2, height: r * 2, transform: 'translate(-50%,-50%)',
-                     borderRadius: '9999px', background: `${col}55`, border: `2px solid ${col}`, zIndex: 5,
+                     borderRadius: '9999px', background: `${col}${sel ? '99' : '55'}`,
+                     border: `${sel ? 3 : 2}px solid ${col}`, zIndex: sel ? 7 : 5, padding: 0,
+                     opacity: dim ? 0.4 : 1,
+                     boxShadow: sel ? `0 0 0 4px ${col}44, 0 2px 8px rgba(0,0,0,0.25)` : 'none',
+                     transition: 'opacity .15s, box-shadow .15s',
                    }}>
                 <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold text-foreground"
                       style={{ top: r * 2 + 2, textShadow: '0 1px 2px rgba(255,255,255,0.9)' }}>
                   {p.region} · {N(p.cases)}
                 </span>
-              </div>
+              </button>
             );
           })}
           <div className="absolute bottom-1 right-2 text-[9px] text-muted-foreground/80 bg-background/70 px-1 rounded" style={{ zIndex: 6 }}>
@@ -458,6 +471,7 @@ export function FraudControlCenterPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [band, setBand] = useState<'ALL' | 'CRITICAL' | 'HIGH' | 'MEDIUM'>('ALL');
   const [q, setQ] = useState('');
+  const [selRegion, setSelRegion] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [simOn, setSimOn] = useState(false);
   const [simCount, setSimCount] = useState(0);
@@ -527,9 +541,12 @@ export function FraudControlCenterPage() {
   const filteredQueue = useMemo(() => {
     return queue.filter((r) =>
       (band === 'ALL' || r.risk_band === band) &&
+      (selRegion === null || r.region === selRegion) &&
       (q === '' || r.customer_id.toLowerCase().includes(q.toLowerCase()) || r.txn_id.toLowerCase().includes(q.toLowerCase())),
     );
-  }, [queue, band, q]);
+  }, [queue, band, q, selRegion]);
+
+  const selHotspot = useMemo(() => regions.find((r) => r.region === selRegion) ?? null, [regions, selRegion]);
 
   // fraud-rate trend sparkline data (recent 45 days) + spike detection
   const trend = useMemo(() => daily.slice(-45), [daily]);
@@ -665,19 +682,56 @@ export function FraudControlCenterPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="shadow-sm lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Fraud Hotspots by Region</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" /> Fraud Hotspots by Region
+              <span className="text-xs font-normal text-muted-foreground">· click a hotspot to drill in</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-[340px] w-full" /> : (
               <>
-                <RegionMap regions={regions} />
-                <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-2 flex-wrap">
-                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#10b981' }} /> low</span>
-                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#f59e0b' }} /> elevated</span>
-                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#f97316' }} /> high</span>
-                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#dc2626' }} /> severe</span>
-                  <span className="ml-1">· bubble size = case count</span>
-                </div>
+                <RegionMap regions={regions} selected={selRegion} onSelect={setSelRegion} />
+                {selHotspot ? (
+                  <div className="mt-3 rounded-lg border border-l-4 border-l-primary bg-primary/5 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-primary" /> {selHotspot.region}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          {N(selHotspot.cases)} flagged · {N(selHotspot.critical)} critical · {N(selHotspot.customers)} customers · queue below filtered to this region
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setSelRegion(null)}>
+                        <XCircle className="h-3.5 w-3.5 mr-1" /> Clear
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2.5">
+                      <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">At risk</div><div className="text-sm font-bold text-red-600 dark:text-red-400">{rp(N(selHotspot.amount_bn) * 1e9)}</div></div>
+                      <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Avg score</div><div className="text-sm font-bold text-foreground">{N(selHotspot.avg_score).toFixed(3)}</div></div>
+                      <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Cross-border</div><div className="text-sm font-bold text-foreground">{N(selHotspot.foreign_pct).toFixed(0)}%</div></div>
+                      <div><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Night / new device</div><div className="text-sm font-bold text-foreground">{N(selHotspot.night_pct).toFixed(0)}% / {N(selHotspot.new_device_pct).toFixed(0)}%</div></div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5 text-[11px]">
+                      <span className="text-muted-foreground">Driven by:</span>
+                      <Badge variant="destructive" className="text-[10px]">{String(selHotspot.top_reason ?? '').replace(/_/g, ' ')}</Badge>
+                      <Badge variant="secondary" className="text-[10px]">{selHotspot.top_channel}</Badge>
+                      <Badge variant="secondary" className="text-[10px]">{selHotspot.top_merchant}</Badge>
+                    </div>
+                    <Button variant="ghost" size="sm" className="mt-2 h-7 gap-1 text-primary"
+                      onClick={() => { void navigate(`/ask?q=${encodeURIComponent(`What are the top fraud patterns in ${selHotspot.region} and which merchant categories drive them?`)}`); }}>
+                      <MessageSquare className="h-3.5 w-3.5" /> Ask Amar about {selHotspot.region}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-2 flex-wrap">
+                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#10b981' }} /> low</span>
+                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#f59e0b' }} /> elevated</span>
+                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#f97316' }} /> high</span>
+                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: '#dc2626' }} /> severe</span>
+                    <span className="ml-1">· bubble size &amp; colour = flagged-case volume · click to filter the queue &amp; see the breakdown</span>
+                  </div>
+                )}
               </>
             )}
           </CardContent>
@@ -752,7 +806,14 @@ export function FraudControlCenterPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <CardTitle className="text-base flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-primary" /> Live Fraud Queue</CardTitle>
-              <div className="flex gap-1 flex-wrap">
+              <div className="flex gap-1 flex-wrap items-center">
+                {selRegion && (
+                  <button onClick={() => setSelRegion(null)}
+                    className="text-xs rounded-md px-2 py-1 border border-primary bg-primary/10 text-primary flex items-center gap-1"
+                    title="Clear region filter">
+                    <MapPin className="h-3 w-3" /> {selRegion} <XCircle className="h-3 w-3" />
+                  </button>
+                )}
                 {(['ALL', 'CRITICAL', 'HIGH', 'MEDIUM'] as const).map((b) => (
                   <button key={b} onClick={() => setBand(b)}
                     className={`text-xs rounded-md px-2 py-1 border transition-colors ${b === band ? 'bg-primary text-primary-foreground border-primary' : 'bg-card hover:border-primary/50'}`}>

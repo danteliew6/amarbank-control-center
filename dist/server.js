@@ -263,8 +263,16 @@ createApp({
         SELECT region,
                COUNT(*)::int                                                        AS cases,
                SUM(CASE WHEN risk_band='CRITICAL' THEN 1 ELSE 0 END)::int           AS critical,
+               SUM(CASE WHEN risk_band='HIGH' THEN 1 ELSE 0 END)::int               AS high,
                ROUND((SUM(amount)/1e9)::numeric, 2)::float8                         AS amount_bn,
-               ROUND(AVG(fraud_score)::numeric, 3)::float8                          AS avg_score
+               ROUND(AVG(fraud_score)::numeric, 3)::float8                          AS avg_score,
+               COUNT(DISTINCT customer_id)::int                                     AS customers,
+               ROUND((SUM((is_foreign_ip)::int)::numeric  / NULLIF(COUNT(*),0))*100, 1)::float8 AS foreign_pct,
+               ROUND((SUM((is_night)::int)::numeric       / NULLIF(COUNT(*),0))*100, 1)::float8 AS night_pct,
+               ROUND((SUM((is_new_device)::int)::numeric  / NULLIF(COUNT(*),0))*100, 1)::float8 AS new_device_pct,
+               mode() WITHIN GROUP (ORDER BY top_reason)        AS top_reason,
+               mode() WITHIN GROUP (ORDER BY channel)           AS top_channel,
+               mode() WITHIN GROUP (ORDER BY merchant_category) AS top_merchant
         FROM feed
         GROUP BY region
         ORDER BY cases DESC`);
