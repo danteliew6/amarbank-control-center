@@ -1,4 +1,4 @@
-import { analytics, createApp, genie, lakebase, server } from "@databricks/appkit";
+import { analytics, createApp, genie, lakebase, server, serving } from "@databricks/appkit";
 import { z } from "zod";
 
 //#region server/server.ts
@@ -18,6 +18,7 @@ createApp({
 		analytics(),
 		genie(),
 		server(),
+		serving(),
 		lakebase()
 	],
 	async onPluginsReady(appkit) {

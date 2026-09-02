@@ -4,5 +4,7 @@ env:
     valueFrom: sql-warehouse
   - name: DATABRICKS_GENIE_SPACE_ID
     valueFrom: genie-space
+  - name: DATABRICKS_SERVING_ENDPOINT_NAME
+    valueFrom: serving-endpoint
   - name: LAKEBASE_ENDPOINT
     valueFrom: postgres

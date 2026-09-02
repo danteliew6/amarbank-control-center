@@ -1,4 +1,4 @@
-import { createApp, analytics, genie, server, lakebase } from '@databricks/appkit';
+import { createApp, analytics, genie, server, serving, lakebase } from '@databricks/appkit';
 import { z } from 'zod';
 
 // Write-back payload: a fraud-ops decision on a flagged transaction / case.
@@ -11,7 +11,7 @@ const CaseActionInput = z.object({
 });
 
 createApp({
-  plugins: [analytics(), genie(), server(), lakebase()],
+  plugins: [analytics(), genie(), server(), serving(), lakebase()],
   // Operational-serving reads: the curated gold layer is loaded into Lakebase Postgres
   // (public.gold_fraud_queue / gold_c360 / gold_fraud_daily) and served to the app at OLTP
   // latency instead of re-aggregating on the warehouse. Write-back: fraud-ops decisions

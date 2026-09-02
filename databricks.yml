@@ -8,6 +8,8 @@ variables:
     description: Default Genie Space ID
   genie_space_name:
     description: Genie Space display name
+  serving_endpoint_name:
+    description: Serving endpoint name
   lakebase_branch:
     description: Lakebase branch resource name
   lakebase_database:
@@ -24,6 +26,7 @@ resources:
         url: https://github.com/danteliew6/amarbank-control-center
       user_api_scopes:
         - dashboards.genie
+        - serving.serving-endpoints
 
       resources:
         - name: sql-warehouse
@@ -35,6 +38,10 @@ resources:
             name: ${var.genie_space_name}
             space_id: ${var.genie_space_id}
             permission: CAN_RUN
+        - name: serving-endpoint
+          serving_endpoint:
+            name: ${var.serving_endpoint_name}
+            permission: CAN_QUERY
         - name: postgres
           postgres:
             branch: ${var.lakebase_branch}
@@ -50,5 +57,6 @@ targets:
       sql_warehouse_id: 114b2f7bfa1273b1
       genie_space_id: 01f1a6a6720b178c97b9b02beb3d0741
       genie_space_name: Amar Bank Retail Assistant
+      serving_endpoint_name: amarbank-txn-fraud
       lakebase_branch: projects/amarbank-cc-db/branches/production
       lakebase_database: projects/amarbank-cc-db/branches/production/databases/databricks-postgres

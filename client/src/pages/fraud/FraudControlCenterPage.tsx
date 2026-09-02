@@ -7,14 +7,16 @@ import {
   Skeleton,
   Badge,
   Input,
+  Label,
   useAnalyticsQuery,
+  useServingInvoke,
 } from '@databricks/appkit-ui/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import {
   ShieldAlert, AlertTriangle, CheckCircle2, MapPin, Activity, RefreshCw,
-  MessageSquare, XCircle, ArrowUpCircle, TrendingUp, Radio,
+  MessageSquare, XCircle, ArrowUpCircle, TrendingUp, Radio, Calculator, Sparkles,
 } from 'lucide-react';
 
 const REFRESH_MS = 20000;
@@ -226,6 +228,216 @@ function StatTile({ label, value, tone, hint }: { label: string; value: string; 
         <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
         <div className={`text-2xl font-bold mt-1 ${tone ?? 'text-foreground'}`}>{value}</div>
         {hint && <div className="text-[11px] text-muted-foreground mt-0.5">{hint}</div>}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// What-if: score a transaction against the live Mosaic AI fraud endpoint.
+// The UI collects a few human-friendly inputs and derives the 17 all-double
+// features the endpoint expects; the exactly-one-hot ch_* fields come from the
+// selected channel. Scoring runs through the serving() plugin (useServingInvoke).
+// ---------------------------------------------------------------------------
+const CHANNELS = ['QRIS', 'TRANSFER', 'ATM', 'CARD', 'TOPUP', 'BILLPAY'] as const;
+type Channel = (typeof CHANNELS)[number];
+
+interface WhatIfState {
+  amount: number; channel: Channel; night: boolean; foreign: boolean;
+  newDevice: boolean; highRisk: boolean; distance: number; velocity: number; zscore: number;
+}
+const PRESETS: { label: string; icon: ReactNode; state: WhatIfState }[] = [
+  { label: 'Normal QRIS payment', icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    state: { amount: 48000, channel: 'QRIS', night: false, foreign: false, newDevice: false, highRisk: false, distance: 3, velocity: 1, zscore: 0.2 } },
+  { label: 'Late-night foreign cashout', icon: <TrendingUp className="h-3.5 w-3.5" />,
+    state: { amount: 5200000, channel: 'TRANSFER', night: true, foreign: true, newDevice: false, highRisk: true, distance: 940, velocity: 5, zscore: 3.5 } },
+  { label: 'New-device account takeover', icon: <ShieldAlert className="h-3.5 w-3.5" />,
+    state: { amount: 3000000, channel: 'TRANSFER', night: true, foreign: true, newDevice: true, highRisk: true, distance: 620, velocity: 4, zscore: 3.0 } },
+];
+
+function scoreBand(s: number): { label: string; tone: string; bar: string; badge: 'destructive' | 'secondary' } {
+  if (s >= 0.8) return { label: 'CRITICAL', tone: 'text-red-600 dark:text-red-400', bar: 'bg-red-600', badge: 'destructive' };
+  if (s >= 0.5) return { label: 'HIGH', tone: 'text-orange-600 dark:text-orange-400', bar: 'bg-orange-500', badge: 'destructive' };
+  if (s >= 0.3) return { label: 'MEDIUM', tone: 'text-amber-600 dark:text-amber-400', bar: 'bg-amber-500', badge: 'secondary' };
+  return { label: 'LOW — cleared', tone: 'text-emerald-600 dark:text-emerald-400', bar: 'bg-emerald-500', badge: 'secondary' };
+}
+
+function extractScore(data: unknown): number | null {
+  const preds = (data as { predictions?: unknown })?.predictions;
+  if (!Array.isArray(preds) || preds.length === 0) return null;
+  const arr: unknown[] = preds;
+  const first = arr[0];
+  if (typeof first === 'number') return first;
+  if (first && typeof first === 'object' && 'fraud_score' in first) {
+    const v = (first as { fraud_score: unknown }).fraud_score;
+    return typeof v === 'number' ? v : Number(v);
+  }
+  return null;
+}
+
+function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      onClick={() => onChange(!on)}
+      className={`text-xs rounded-md px-2.5 py-1.5 border transition-colors ${
+        on ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground hover:border-primary/50'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function WhatIfScore() {
+  const [st, setSt] = useState<WhatIfState>(PRESETS[0].state);
+  const set = <K extends keyof WhatIfState>(k: K, v: WhatIfState[K]) => setSt((s) => ({ ...s, [k]: v }));
+  const { invoke, loading, error } = useServingInvoke({});
+  const [score, setScore] = useState<number | null>(null);
+
+  function run() {
+    const rec = {
+      amount: st.amount,
+      log_amount: Math.log(st.amount + 1),
+      txn_hour: st.night ? 2 : 14,
+      is_night: st.night ? 1 : 0,
+      is_foreign_ip: st.foreign ? 1 : 0,
+      is_new_device: st.newDevice ? 1 : 0,
+      home_distance_km: st.distance,
+      merchant_high_risk: st.highRisk ? 1 : 0,
+      txn_velocity_1h: st.velocity,
+      device_txn_24h: st.newDevice ? 1 : 8,
+      amount_zscore: st.zscore,
+      ch_qris: st.channel === 'QRIS' ? 1 : 0,
+      ch_transfer: st.channel === 'TRANSFER' ? 1 : 0,
+      ch_atm: st.channel === 'ATM' ? 1 : 0,
+      ch_card: st.channel === 'CARD' ? 1 : 0,
+      ch_topup: st.channel === 'TOPUP' ? 1 : 0,
+      ch_billpay: st.channel === 'BILLPAY' ? 1 : 0,
+    };
+    void invoke({ dataframe_records: [rec] }).then((res) => {
+      const s = extractScore(res);
+      if (s !== null) setScore(s);
+    });
+  }
+
+  const band = score !== null ? scoreBand(score) : null;
+  const pct = score !== null ? Math.round(score * 1000) / 10 : 0;
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2"><Calculator className="h-4 w-4 text-primary" /> What-if: score a transaction</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Score a hypothetical transaction against the live Mosaic AI endpoint <span className="font-mono">amarbank-txn-fraud</span>.
+          Pick a preset or adjust the inputs — the 17 model features are derived automatically.
+        </p>
+
+        {/* presets */}
+        <div className="flex flex-wrap gap-2">
+          {PRESETS.map((p) => (
+            <button key={p.label} onClick={() => { setSt(p.state); setScore(null); }}
+              className="flex items-center gap-1.5 text-xs rounded-full border px-3 py-1.5 bg-card hover:border-primary/50 hover:bg-accent transition-colors">
+              {p.icon} {p.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* inputs */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Amount (IDR)</Label>
+              <Input type="number" value={st.amount} min={0} step={10000}
+                onChange={(e) => set('amount', Math.max(0, Number(e.target.value) || 0))} />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Channel</Label>
+              <div className="flex flex-wrap gap-1">
+                {CHANNELS.map((c) => (
+                  <button key={c} onClick={() => set('channel', c)}
+                    className={`text-xs rounded-md px-2 py-1 border transition-colors ${
+                      st.channel === c ? 'bg-primary text-primary-foreground border-primary' : 'bg-card hover:border-primary/50'
+                    }`}>{c}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Signals</Label>
+              <div className="flex flex-wrap gap-1.5">
+                <Toggle label="New device" on={st.newDevice} onChange={(v) => set('newDevice', v)} />
+                <Toggle label="Foreign IP" on={st.foreign} onChange={(v) => set('foreign', v)} />
+                <Toggle label="Night hour" on={st.night} onChange={(v) => set('night', v)} />
+                <Toggle label="High-risk merchant" on={st.highRisk} onChange={(v) => set('highRisk', v)} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Distance from home</Label>
+                <span className="text-xs font-medium text-foreground">{st.distance} km</span>
+              </div>
+              <input type="range" min={0} max={2000} step={10} value={st.distance}
+                onChange={(e) => set('distance', Number(e.target.value))} className="w-full accent-[#1C75BC]" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">1h velocity</Label>
+                  <span className="text-xs font-medium text-foreground">{st.velocity}</span>
+                </div>
+                <input type="range" min={0} max={20} step={1} value={st.velocity}
+                  onChange={(e) => set('velocity', Number(e.target.value))} className="w-full accent-[#2BB4C4]" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Amount z-score</Label>
+                  <span className="text-xs font-medium text-foreground">{st.zscore.toFixed(1)}</span>
+                </div>
+                <input type="range" min={0} max={6} step={0.1} value={st.zscore}
+                  onChange={(e) => set('zscore', Number(e.target.value))} className="w-full accent-[#2BB4C4]" />
+              </div>
+            </div>
+
+            <Button onClick={run} disabled={loading} className="gap-1.5">
+              <Sparkles className="h-4 w-4" /> {loading ? 'Scoring…' : 'Score transaction'}
+            </Button>
+            {error && <div className="text-destructive text-xs">Error: {error}</div>}
+          </div>
+
+          {/* result */}
+          <div className="rounded-lg border bg-muted/30 p-4 flex flex-col justify-center">
+            {score === null ? (
+              <div className="text-center text-sm text-muted-foreground py-8">
+                Pick a preset and hit <span className="font-medium text-foreground">Score transaction</span> to see the model’s fraud probability.
+              </div>
+            ) : band && (
+              <div className="space-y-3">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Fraud probability</div>
+                    <div className={`text-4xl font-bold ${band.tone}`}>{pct}%</div>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant={band.badge}>{score >= 0.5 ? '⚠ Block & review' : '✓ Allow'}</Badge>
+                    <div className={`text-sm font-semibold mt-1 ${band.tone}`}>{band.label}</div>
+                  </div>
+                </div>
+                <div className="relative h-3 w-full rounded-full bg-muted overflow-hidden">
+                  <div className={`h-full ${band.bar} transition-all`} style={{ width: `${Math.max(1, pct)}%` }} />
+                </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>Low</span><span>Medium</span><span>High</span><span>Critical</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Scored live by <span className="font-mono">amarbank-txn-fraud</span> (Mosaic AI Model Serving).</p>
+              </div>
+            )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
@@ -479,6 +691,9 @@ export function FraudControlCenterPage() {
           {spikeDay && <p className="text-[11px] text-muted-foreground mt-1">Peak {N(spikeDay.fraud_rate_pct).toFixed(2)}% on {spikeDay.day} (highlighted).</p>}
         </CardContent>
       </Card>
+
+      {/* what-if scoring against the live serving endpoint */}
+      <WhatIfScore />
 
       {/* live queue + transaction stream */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
