@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 150" role="img" aria-label="Amar Bank">
+  <defs>
+    <linearGradient id="abGradFull" x1="0%" y1="10%" x2="100%" y2="90%">
+      <stop offset="0%"  stop-color="#8DC63F"/>
+      <stop offset="28%" stop-color="#4FC0A6"/>
+      <stop offset="58%" stop-color="#2BB4C4"/>
+      <stop offset="100%" stop-color="#1C75BC"/>
+    </linearGradient>
+  </defs>
+  <path fill="none" stroke="url(#abGradFull)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"
+        d="M120 58 C 96 20, 42 20, 42 58 C 42 96, 96 96, 120 58 C 144 20, 198 20, 198 58 C 198 96, 144 96, 120 58 Z"/>
+  <text x="120" y="138" text-anchor="middle" font-family="'Poppins','Segoe UI',system-ui,sans-serif"
+        font-size="34" font-weight="700" letter-spacing="1" fill="#1C75BC">amar bank</text>
+</svg>

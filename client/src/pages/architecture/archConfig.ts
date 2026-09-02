@@ -44,7 +44,7 @@ export const ZONES: Zone[] = [
     step: '02',
     title: 'Ingestion & Data Quality',
     subtitle: 'Lakeflow Declarative Pipelines',
-    accent: '#7C3AED',
+    accent: '#8DC63F',
     chips: [
       { id: 'lakeflow', product: 'Lakeflow Declarative Pipelines', caption: 'amarbank_dq_pipeline', icon: '🔌',
         detail: 'Managed ingestion + declarative data-quality expectations. Raw events land in bronze; rows that fail expectations are dropped to transactions_quarantine with a labelled reason; conformed records flow to silver and curated gold.' },
@@ -60,7 +60,7 @@ export const ZONES: Zone[] = [
     step: '03',
     title: 'Governance',
     subtitle: 'Unity Catalog',
-    accent: '#4C2A86',
+    accent: '#1C75BC',
     chips: [
       { id: 'uc', product: 'Unity Catalog', caption: 'dante_classic_stable_catalog.amarbank_retail', icon: '🛡️',
         detail: 'One governance layer for every asset: PII column masks (name / NIK / phone / email on customer_pii), region-scoped ABAC row filters driven by access_allowlist, end-to-end lineage and audit — enforced identically across BI, AI and this app.' },
@@ -71,7 +71,7 @@ export const ZONES: Zone[] = [
     step: '04',
     title: 'Semantic Layer',
     subtitle: 'Metric Views',
-    accent: '#CA8A04',
+    accent: '#4FC0A6',
     chips: [
       { id: 'metrics', product: 'Unity Catalog Metric Views', caption: 'metrics_transactions · metrics_fraud · metrics_deposits', icon: '📐',
         detail: 'Reusable, governed KPI definitions (transaction volume, fraud rate, deposit balances) defined once and shared consistently across Genie and dashboards.' },
@@ -82,7 +82,7 @@ export const ZONES: Zone[] = [
     step: '05',
     title: 'AI & Machine Learning',
     subtitle: 'Mosaic AI',
-    accent: '#0891B2',
+    accent: '#2BB4C4',
     chips: [
       { id: 'serving', product: 'Mosaic AI Model Serving', caption: 'amarbank-txn-fraud · churn · clv → gold_c360', icon: '🤖',
         detail: 'Real-time transaction fraud scoring plus churn / CLV / next-best-action models. Predictions are materialized into gold_c360 and the fraud queue for operational use.' },
@@ -93,7 +93,7 @@ export const ZONES: Zone[] = [
     step: '06',
     title: 'Serving & Consumption',
     subtitle: 'Governed delivery',
-    accent: '#0D9488',
+    accent: '#0E5A9C',
     chips: [
       { id: 'genie', product: 'AI/BI Genie', caption: 'Amar Bank Retail Assistant', icon: '💬',
         detail: 'Natural-language analytics over the governed gold model in English or Bahasa Indonesia, with auto-generated SQL and visualizations.' },
@@ -108,7 +108,7 @@ export const ZONES: Zone[] = [
     step: '07',
     title: 'Application',
     subtitle: 'This control center',
-    accent: '#6D28D9',
+    accent: '#1C75BC',
     chips: [
       { id: 'app', product: 'Databricks Apps', caption: 'amarbank-control-center', icon: '🖥️',
         detail: 'The white-labeled Databricks App you are using now — fraud control center, Customer 360, ops overview, Genie chat, governance and this architecture, all on one governed platform.' },

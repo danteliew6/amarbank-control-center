@@ -17,20 +17,28 @@ import { AiBiDashboardPage } from './pages/dashboard/AiBiDashboardPage';
 import { GovernancePage } from './pages/governance/GovernancePage';
 import { ArchitecturePage } from './pages/architecture/ArchitecturePage';
 
-// A stylized "A" badge + wordmark stands in for the official Amar Bank trademark.
+// Official Amar Bank logo (infinity mark + wordmark) in a white pill so the brand-blue
+// wordmark reads on the gradient header. Falls back to the mark-only SVG, then a wordmark.
 function AmarMark() {
+  const [step, setStep] = useState(0);
+  const src = step === 0 ? '/amar-logo.svg' : '/amar-mark.svg';
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm">
-        <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true">
-          <path d="M32 6 L58 58 H44 L32 30 L20 58 H6 Z" fill="#4c2a86" />
-          <circle cx="32" cy="44" r="5" fill="#f4b740" />
-        </svg>
+    <div className="flex items-center gap-3">
+      <div className="rounded-lg bg-white px-3 py-1.5 shadow-sm">
+        {step < 2 ? (
+          <img
+            src={src}
+            alt="Amar Bank"
+            className="h-7 w-auto max-w-[136px] object-contain"
+            onError={() => setStep((s) => s + 1)}
+          />
+        ) : (
+          <span className="font-bold text-base tracking-tight" style={{ color: '#1C75BC' }}>amar bank</span>
+        )}
       </div>
-      <div className="leading-tight">
-        <div className="text-white font-bold text-base tracking-tight">Amar Bank</div>
-        <div className="text-white/70 text-[11px] -mt-0.5">Retail Control Center</div>
-      </div>
+      <span className="hidden sm:inline text-white/85 text-sm border-l border-white/30 pl-3">
+        Retail Control Center
+      </span>
     </div>
   );
 }

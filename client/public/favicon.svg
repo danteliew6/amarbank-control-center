@@ -1,6 +1,12 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M64 64H224V224H64V64Z" fill="#FABFBA"/>
-<path d="M440 448L280 448L280 352C280 316.654 308.654 288 344 288L376 288C411.346 288 440 316.654 440 352L440 448Z" fill="#FABFBA"/>
-<path d="M152 288L240 448H64L152 288Z" fill="#FF5F46"/>
-<path d="M280 148C280 101.608 317.608 64 364 64V64C410.392 64 448 101.608 448 148V148C448 194.392 410.392 232 364 232V232C317.608 232 280 194.392 280 148V148Z" fill="#FF5F46"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 110" role="img" aria-label="Amar Bank">
+  <defs>
+    <linearGradient id="abGrad" x1="0%" y1="10%" x2="100%" y2="90%">
+      <stop offset="0%"  stop-color="#8DC63F"/>
+      <stop offset="28%" stop-color="#4FC0A6"/>
+      <stop offset="58%" stop-color="#2BB4C4"/>
+      <stop offset="100%" stop-color="#1C75BC"/>
+    </linearGradient>
+  </defs>
+  <path fill="none" stroke="url(#abGrad)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"
+        d="M110 55 C 86 14, 30 14, 30 55 C 30 96, 86 96, 110 55 C 134 14, 190 14, 190 55 C 190 96, 134 96, 110 55 Z"/>
 </svg>

@@ -1,5 +1,5 @@
 {
-  "name": "Amar Bank Retail Control Center",
+  "name": "Amar Bank Control Center",
   "short_name": "Amar Bank",
   "icons": [
     {
@@ -13,7 +13,7 @@
       "type": "image/png"
     }
   ],
-  "theme_color": "#ffffff",
+  "theme_color": "#1C75BC",
   "background_color": "#ffffff",
   "display": "standalone"
 }

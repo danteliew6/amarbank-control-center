@@ -103,9 +103,9 @@ export function ArchitecturePage() {
           {showGov && (
             <div
               className="mt-4 rounded-lg border border-dashed p-3 flex flex-wrap items-center gap-x-4 gap-y-1"
-              style={{ borderColor: '#4C2A8666', backgroundColor: '#4C2A8610' }}
+              style={{ borderColor: '#0E5A9C66', backgroundColor: '#0E5A9C10' }}
             >
-              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: '#4C2A86' }}>
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: '#0E5A9C' }}>
                 <ShieldCheck className="h-3.5 w-3.5" /> {GOVERNANCE_RIBBON.title}
               </span>
               {GOVERNANCE_RIBBON.points.map((p) => (
@@ -157,18 +157,18 @@ export function ArchitecturePage() {
               <span className="text-[11px] font-semibold">Databricks</span>
             </div>
 
-            <div className="rounded-lg border-2 p-4" style={{ borderColor: '#0D9488', backgroundColor: '#0D94880F' }}>
-              <div className="text-[11px] font-semibold uppercase tracking-wide mb-3" style={{ color: '#0D9488' }}>
+            <div className="rounded-lg border-2 p-4" style={{ borderColor: '#2BB4C4', backgroundColor: '#2BB4C40F' }}>
+              <div className="text-[11px] font-semibold uppercase tracking-wide mb-3" style={{ color: '#2BB4C4' }}>
                 After · one governed Lakehouse
               </div>
               <div className="flex flex-wrap gap-2">
                 {['Lakeflow Declarative Pipelines', 'Unity Catalog', 'Metric Views', 'AI/BI Genie', 'Mosaic AI Serving', 'Lakebase', 'Databricks Apps'].map((t) => (
-                  <span key={t} className="text-[11px] rounded-md px-2 py-1 font-medium" style={{ backgroundColor: '#0D94881A', color: '#0D9488' }}>
+                  <span key={t} className="text-[11px] rounded-md px-2 py-1 font-medium" style={{ backgroundColor: '#2BB4C41A', color: '#2BB4C4' }}>
                     ✓ {t}
                   </span>
                 ))}
               </div>
-              <div className="text-[11px] mt-3" style={{ color: '#0D9488' }}>Real-time fraud scoring + governed C360 on one platform — no rip-and-replace</div>
+              <div className="text-[11px] mt-3" style={{ color: '#2BB4C4' }}>Real-time fraud scoring + governed C360 on one platform — no rip-and-replace</div>
             </div>
           </div>
         </CardContent>

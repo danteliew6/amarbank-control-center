@@ -471,7 +471,7 @@ export function FraudControlCenterPage() {
                 return (
                   <div key={d.day} className="flex-1 rounded-sm transition-all"
                     title={`${d.day} · ${N(d.fraud_rate_pct).toFixed(2)}% (${N(d.fraud_txns)} fraud / ${N(d.txns)} txns)`}
-                    style={{ height: h, backgroundColor: isSpike ? '#dc2626' : '#7c3aed', opacity: isSpike ? 1 : 0.6 }} />
+                    style={{ height: h, backgroundColor: isSpike ? '#dc2626' : '#1C75BC', opacity: isSpike ? 1 : 0.6 }} />
                 );
               })}
             </div>

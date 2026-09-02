@@ -1,44 +1,46 @@
 @import "@databricks/appkit-ui/styles.css";
 
-/* ===== Amar Bank whitelabel theme =====
-   Amar Bank is an Indonesian digital bank (Senyumku savings + Tunaiku lending).
-   Deep indigo/violet primary for the chrome; semantic red/amber/emerald are kept
-   free for fraud-risk banding on the data surfaces. */
+/* ===== Amar Bank whitelabel theme — real brand palette =====
+   Brand blue #1C75BC primary; teal/aqua/green for secondary accents & non-semantic
+   chart series. Fraud-risk semantics (red/amber/yellow/green) are NOT brand colors and
+   are set inline on the data surfaces — do not encode risk with these tokens. */
 :root {
   --radius: 0.625rem;
-  --primary: oklch(0.48 0.17 285);          /* indigo-violet */
-  --primary-foreground: oklch(0.99 0 0);
-  --ring: oklch(0.55 0.16 288);
-  --accent: oklch(0.95 0.03 288);
-  --accent-foreground: oklch(0.32 0.12 285);
-  /* chart palette: violet family + teal + gold */
-  --chart-1: oklch(0.48 0.17 285);
-  --chart-2: oklch(0.60 0.15 300);
-  --chart-3: oklch(0.66 0.12 200);
-  --chart-4: oklch(0.80 0.14 85);
-  --chart-5: oklch(0.62 0.19 25);
+  --primary: #1C75BC;              /* brand blue — buttons, active nav, links, focus */
+  --primary-foreground: #ffffff;
+  --ring: #1C75BC;
+  --accent: #E8F1FB;               /* very light blue surface */
+  --accent-foreground: #0E5A9C;
+  /* non-semantic chart palette: brand family blue → teal → aqua → green */
+  --chart-1: #1C75BC;
+  --chart-2: #2BB4C4;
+  --chart-3: #4FC0A6;
+  --chart-4: #8DC63F;
+  --chart-5: #0E5A9C;
   /* Amar brand tokens for custom UI */
-  --ab-indigo: #4c2a86;
-  --ab-violet: #7c3aed;
-  --ab-gold: #f4b740;
+  --ab-blue: #1C75BC;
+  --ab-deep: #0E5A9C;
+  --ab-teal: #2BB4C4;
+  --ab-aqua: #4FC0A6;
+  --ab-green: #8DC63F;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --primary: oklch(0.68 0.16 288);
-    --primary-foreground: oklch(0.15 0.02 285);
-    --ring: oklch(0.68 0.16 288);
-    --accent: oklch(0.30 0.07 285);
-    --accent-foreground: oklch(0.95 0.02 288);
-    --chart-1: oklch(0.70 0.16 288);
-    --chart-2: oklch(0.66 0.15 305);
-    --chart-3: oklch(0.70 0.12 200);
-    --chart-4: oklch(0.82 0.15 85);
-    --chart-5: oklch(0.68 0.19 25);
+    --primary: #4FA3DE;            /* lightened brand blue for dark surfaces */
+    --primary-foreground: #06233d;
+    --ring: #4FA3DE;
+    --accent: #123047;
+    --accent-foreground: #CFE6F9;
+    --chart-1: #4FA3DE;
+    --chart-2: #3FC3D3;
+    --chart-3: #5FCEB4;
+    --chart-4: #9FD24F;
+    --chart-5: #1C75BC;
   }
 }
 
-/* Amar Bank gradient header bar */
+/* Amar Bank brand gradient — header bar / hero / section accents */
 .ab-header {
-  background: linear-gradient(90deg, var(--ab-indigo) 0%, var(--ab-violet) 100%);
+  background: linear-gradient(90deg, #8DC63F 0%, #4FC0A6 30%, #2BB4C4 60%, #1C75BC 100%);
 }
