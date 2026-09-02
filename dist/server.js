@@ -41,6 +41,19 @@ function buildFraudFeatures(i) {
 		ch_billpay: i.channel === "BILLPAY" ? 1 : 0
 	};
 }
+const SimInput = z.object({ n: z.number().int().min(1).max(25).optional() });
+const FRAUD_FEED_CTE = `
+  WITH feed AS (
+    SELECT txn_id, customer_id, account_id, channel, merchant_category, amount, txn_ts, region,
+           device_id, ip_country, home_distance_km, is_night, is_new_device, is_foreign_ip,
+           fraud_score, top_reason, risk_band, is_fraud, FALSE AS is_live
+    FROM public.gold_fraud_queue
+    UNION ALL
+    SELECT txn_id, customer_id, account_id, channel, merchant_category, amount, txn_ts, region,
+           device_id, ip_country, home_distance_km, is_night, is_new_device, is_foreign_ip,
+           fraud_score, top_reason, risk_band, is_fraud, TRUE AS is_live
+    FROM ops.live_fraud_feed
+  )`;
 const CaseActionInput = z.object({
 	txn_id: z.string().max(64).optional(),
 	case_id: z.string().max(64).optional(),
@@ -75,6 +88,34 @@ createApp({
       );
       CREATE INDEX IF NOT EXISTS idx_fraud_case_actions_created_at
         ON ops.fraud_case_actions (created_at DESC);
+
+      -- Live-traffic feed: fresh fraud alerts injected by the demo simulator. Types mirror
+      -- public.gold_fraud_queue on this workspace (bigint amount, boolean flags, timestamptz)
+      -- so it UNIONs cleanly (see FRAUD_FEED_CTE). App-SP-owned and writable — the serving
+      -- snapshot isn't, so "live" arrivals land here and union into the queue at OLTP latency.
+      CREATE TABLE IF NOT EXISTS ops.live_fraud_feed (
+        txn_id            TEXT PRIMARY KEY,
+        customer_id       TEXT,
+        account_id        TEXT,
+        channel           TEXT,
+        merchant_category TEXT,
+        amount            BIGINT,
+        txn_ts            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        region            TEXT,
+        device_id         TEXT,
+        ip_country        TEXT,
+        home_distance_km  DOUBLE PRECISION,
+        is_night          BOOLEAN,
+        is_new_device     BOOLEAN,
+        is_foreign_ip     BOOLEAN,
+        fraud_score       DOUBLE PRECISION,
+        top_reason        TEXT,
+        risk_band         TEXT,
+        is_fraud          BOOLEAN,
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_live_fraud_feed_txn_ts
+        ON ops.live_fraud_feed (txn_ts DESC);
     `);
 		appkit.server.extend((app) => {
 			app.post("/api/score/txn", async (req, res) => {
@@ -130,6 +171,58 @@ createApp({
 					res.status(500).json({ error: String(e) });
 				}
 			});
+			app.post("/api/ops/simulate", async (req, res) => {
+				const parsed = SimInput.safeParse(req.body ?? {});
+				if (!parsed.success) {
+					res.status(400).json({
+						error: "Invalid input",
+						details: parsed.error.issues
+					});
+					return;
+				}
+				const n = parsed.data.n ?? 2;
+				try {
+					const { rows } = await appkit.lakebase.query(`INSERT INTO ops.live_fraud_feed
+               (txn_id, customer_id, account_id, channel, merchant_category, amount, txn_ts,
+                region, device_id, ip_country, home_distance_km, is_night, is_new_device,
+                is_foreign_ip, fraud_score, top_reason, risk_band, is_fraud)
+             SELECT
+               'LIVE-' || replace(gen_random_uuid()::text, '-', ''),
+               customer_id, account_id,
+               (ARRAY['QRIS','TRANSFER','ATM','CARD','TOPUP'])[1 + floor(random()*5)::int],
+               merchant_category,
+               (8000000 + random()*92000000)::bigint,
+               NOW(),
+               region, device_id,
+               (ARRAY['ID','SG','MY','PH','KH','VN','HK'])[1 + floor(random()*7)::int],
+               (random()*1800)::double precision,
+               random() < 0.75, random() < 0.70, random() < 0.80,
+               (0.90 + random()*0.0999)::double precision,
+               (ARRAY['ATO_CASHOUT_NIGHT','QRIS_SCAM','CARD_CNP_FOREIGN','MULE_CASHOUT',
+                      'IMPOSSIBLE_TRAVEL','DEVICE_CHANGE_BURST'])[1 + floor(random()*6)::int],
+               'CRITICAL',
+               TRUE
+             FROM public.gold_fraud_queue
+             ORDER BY random()
+             LIMIT $1
+             RETURNING txn_id`, [n]);
+					const { rows: cnt } = await appkit.lakebase.query(`SELECT COUNT(*)::int AS total_live FROM ops.live_fraud_feed`);
+					res.status(201).json({
+						inserted: rows.length,
+						total_live: cnt[0]?.total_live ?? 0
+					});
+				} catch (e) {
+					res.status(500).json({ error: String(e) });
+				}
+			});
+			app.delete("/api/ops/simulate", async (_req, res) => {
+				try {
+					await appkit.lakebase.query(`TRUNCATE ops.live_fraud_feed`);
+					res.json({ cleared: true });
+				} catch (e) {
+					res.status(500).json({ error: String(e) });
+				}
+			});
 			app.get("/api/ops/case-actions", async (_req, res) => {
 				try {
 					const { rows } = await appkit.lakebase.query(`SELECT id, case_id, txn_id, customer_id, action, actor, note, created_at
@@ -147,17 +240,17 @@ createApp({
 					res.status(500).json({ error: String(e) });
 				}
 			});
-			lbGet("/api/lakebase/fraud-queue", `
+			lbGet("/api/lakebase/fraud-queue", `${FRAUD_FEED_CTE}
         SELECT txn_id, customer_id, account_id, channel, merchant_category,
                amount::float8 AS amount,
                to_char(txn_ts, 'YYYY-MM-DD"T"HH24:MI:SS') AS txn_ts,
                region, device_id, ip_country, home_distance_km,
                is_night, is_new_device, is_foreign_ip,
-               fraud_score, top_reason, risk_band, is_fraud
-        FROM public.gold_fraud_queue
-        ORDER BY fraud_score DESC
+               fraud_score, top_reason, risk_band, is_fraud, is_live
+        FROM feed
+        ORDER BY is_live DESC, fraud_score DESC
         LIMIT 250`);
-			lbGet("/api/lakebase/fraud-kpis", `
+			lbGet("/api/lakebase/fraud-kpis", `${FRAUD_FEED_CTE}
         SELECT COUNT(*)::int                                                        AS queue_size,
                SUM(CASE WHEN risk_band='CRITICAL' THEN 1 ELSE 0 END)::int           AS critical,
                SUM(CASE WHEN risk_band='HIGH' THEN 1 ELSE 0 END)::int               AS high,
@@ -165,14 +258,14 @@ createApp({
                ROUND((SUM(amount)/1e9)::numeric, 2)::float8                         AS amount_at_risk_bn,
                COUNT(DISTINCT customer_id)::int                                     AS customers,
                ROUND(AVG(fraud_score)::numeric, 3)::float8                          AS avg_score
-        FROM public.gold_fraud_queue`);
-			lbGet("/api/lakebase/fraud-by-region", `
+        FROM feed`);
+			lbGet("/api/lakebase/fraud-by-region", `${FRAUD_FEED_CTE}
         SELECT region,
                COUNT(*)::int                                                        AS cases,
                SUM(CASE WHEN risk_band='CRITICAL' THEN 1 ELSE 0 END)::int           AS critical,
                ROUND((SUM(amount)/1e9)::numeric, 2)::float8                         AS amount_bn,
                ROUND(AVG(fraud_score)::numeric, 3)::float8                          AS avg_score
-        FROM public.gold_fraud_queue
+        FROM feed
         GROUP BY region
         ORDER BY cases DESC`);
 			lbGet("/api/lakebase/fraud-daily", `

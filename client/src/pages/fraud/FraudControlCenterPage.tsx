@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 const REFRESH_MS = 20000;
+const SIM_MS = 3500; // cadence of injected live-traffic bursts while simulation is on
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,6 +30,7 @@ interface QueueRow {
   device_id: string; ip_country: string; home_distance_km: number;
   is_night: boolean; is_new_device: boolean; is_foreign_ip: boolean;
   fraud_score: number; top_reason: string; risk_band: string; is_fraud: boolean;
+  is_live?: boolean;
 }
 interface Kpis {
   queue_size: number; critical: number; high: number; medium: number;
@@ -457,6 +459,8 @@ export function FraudControlCenterPage() {
   const [band, setBand] = useState<'ALL' | 'CRITICAL' | 'HIGH' | 'MEDIUM'>('ALL');
   const [q, setQ] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [simOn, setSimOn] = useState(false);
+  const [simCount, setSimCount] = useState(0);
 
   const onQueue = useCallback((d: QueueRow[]) => { setQueue(d); setLoaded(true); setLastUpdated(new Date()); }, []);
   const onKpis = useCallback((d: Kpis[]) => { if (d[0]) setKpis(d[0]); }, []);
@@ -469,6 +473,35 @@ export function FraudControlCenterPage() {
   useEffect(() => {
     const t = setInterval(() => setTick((x) => x + 1), REFRESH_MS);
     return () => clearInterval(t);
+  }, []);
+
+  // live-traffic simulator: while ON, inject a small burst of fresh CRITICAL alerts every
+  // SIM_MS (app-owned ops.live_fraud_feed), then refresh — new alerts stream into the queue.
+  useEffect(() => {
+    if (!simOn) return;
+    let alive = true;
+    const inject = async () => {
+      try {
+        const r = await fetch('/api/ops/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ n: 1 + Math.floor(Math.random() * 3) }),
+        });
+        const d = await r.json();
+        if (alive && typeof d?.inserted === 'number') setSimCount((c) => c + d.inserted);
+      } catch { /* ignore transient errors */ }
+      if (alive) setTick((x) => x + 1);
+    };
+    inject();
+    const t = setInterval(inject, SIM_MS);
+    return () => { alive = false; clearInterval(t); };
+  }, [simOn]);
+
+  const resetSim = useCallback(async () => {
+    setSimOn(false);
+    try { await fetch('/api/ops/simulate', { method: 'DELETE' }); } catch { /* ignore */ }
+    setSimCount(0);
+    setTick((x) => x + 1);
   }, []);
 
   const actedTxns = useMemo(() => {
@@ -576,6 +609,26 @@ export function FraudControlCenterPage() {
             </span>
             LIVE
           </span>
+          <Button
+            variant={simOn ? 'destructive' : 'default'}
+            size="sm"
+            onClick={() => setSimOn((v) => !v)}
+            className="gap-1.5"
+            title={simOn ? 'Stop injecting live fraud traffic' : 'Stream fresh fraud alerts into the queue in real time'}
+          >
+            <Radio className={`h-3.5 w-3.5 ${simOn ? 'animate-pulse' : ''}`} />
+            {simOn ? 'Stop simulation' : 'Simulate live traffic'}
+          </Button>
+          {simCount > 0 && (
+            <>
+              <Badge variant="destructive" className="gap-1" title="Live alerts injected this session">
+                +{simCount} live
+              </Badge>
+              <Button variant="ghost" size="sm" onClick={resetSim} className="text-muted-foreground" title="Clear all simulated live alerts">
+                Reset
+              </Button>
+            </>
+          )}
           <Button variant="ghost" size="sm" onClick={() => setTick((x) => x + 1)} className="gap-1 text-muted-foreground" title="Refresh now">
             <RefreshCw className="h-3.5 w-3.5" />
             {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Refresh'}
@@ -730,13 +783,24 @@ export function FraudControlCenterPage() {
                       {filteredQueue.slice(0, 12).map((r) => {
                         const acted = actedTxns[r.txn_id];
                         return (
-                          <tr key={r.txn_id} className="border-b border-border/50 align-top">
+                          <tr key={r.txn_id} className={`border-b border-border/50 align-top ${B(r.is_live) ? 'border-l-2 border-l-red-500 bg-red-500/5' : ''}`}>
                             <td className="py-2 pr-2">
                               <span className={`font-bold ${BAND_TONE[r.risk_band] ?? ''}`}>{N(r.fraud_score).toFixed(2)}</span>
                               <Badge variant={bandBadge(r.risk_band)} className="ml-1 text-[9px] align-middle">{r.risk_band}</Badge>
                             </td>
                             <td className="py-2 pr-2">
-                              <div className="font-mono text-[11px] text-foreground">{r.txn_id}</div>
+                              <div className="font-mono text-[11px] text-foreground flex items-center gap-1">
+                                {B(r.is_live) && (
+                                  <span className="inline-flex items-center gap-0.5 text-[8px] font-semibold uppercase text-red-600 dark:text-red-400">
+                                    <span className="relative flex h-1.5 w-1.5">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+                                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+                                    </span>
+                                    new
+                                  </span>
+                                )}
+                                {r.txn_id}
+                              </div>
                               <div className="font-mono text-[10px] text-muted-foreground">{r.customer_id}</div>
                               <div className="flex gap-1 mt-0.5 flex-wrap">
                                 {B(r.is_foreign_ip) && <span className="text-[9px] px-1 rounded bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">foreign IP {r.ip_country}</span>}
